@@ -90,7 +90,7 @@ for (k in k_values) {
                               Kappa = kappa_test))
 }
 
-# 3. Modelo MPG para 3, 5 y 7 neuronas
+# 3. Modelo MLP para 3, 5 y 7 neuronas
 
 # Configuraciones de neuronas ocultas
 hidden_neurons <- c(3, 5, 7)
