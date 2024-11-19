@@ -1,0 +1,124 @@
+# Cargar librerías
+library(caret)
+library(OneR)
+library(nnet)
+library(ggplot2)
+
+# Cargar datos
+dataset <- read.csv("~/Documents/UIMP/Ciencia/glass/glass.data", header = FALSE)
+names(dataset) <- c("Id", "RI", "Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe", "Type")
+dataset$Type <- as.factor(dataset$Type)  # Convertir la clase a factor
+dataset <- dataset[, !(names(dataset) %in% c("Id", "K", "Fe", "Ca", "RI"))]
+
+# Dividir los datos en conjunto de entrenamiento y prueba
+set.seed(123)  # Para reproducibilidad
+trainIndex <- createDataPartition(dataset$Type, p = 0.8, list = FALSE)  # 80% entrenamiento
+trainData <- dataset[trainIndex, ]
+testData <- dataset[-trainIndex, ]
+
+# Inicializar tabla para resultados
+results <- data.frame(Model = character(), 
+                      Train_Accuracy = numeric(), Train_Kappa = numeric(),
+                      Test_Accuracy = numeric(), Test_Kappa = numeric(),
+                      stringsAsFactors = FALSE)
+
+# Configuración validación cruzada 
+control <- trainControl(method = "cv", number = 5, savePredictions = "final") 
+
+# 1. Modelo OneR
+model_oner <- OneR(Type ~ ., data = trainData)
+# Predicciones en los conjuntos de entrenamiento y prueba
+predictions_oner_train <- predict(model_oner, trainData)
+predictions_oner_test <- predict(model_oner, testData)
+# Asegurar niveles consistentes en las predicciones
+predictions_oner_train <- factor(predictions_oner_train, levels = levels(dataset$Type))
+predictions_oner_test <- factor(predictions_oner_test, levels = levels(dataset$Type))
+
+# Evaluación de rendimiento
+cm_oner_train <- confusionMatrix(predictions_oner_train, trainData$Type)
+cm_oner_test <- confusionMatrix(predictions_oner_test, testData$Type)
+
+# Métricas de rendimiento
+accuracy_oner_train <- cm_oner_train$overall["Accuracy"]
+kappa_oner_train <- cm_oner_train$overall["Kappa"]
+accuracy_oner_test <- cm_oner_test$overall["Accuracy"]
+kappa_oner_test <- cm_oner_test$overall["Kappa"]
+
+# Guardar resultados de OneR
+results <- rbind(results, data.frame(Model = "OneR (Train)", Accuracy = accuracy_oner_train, Kappa = kappa_oner_train))
+results <- rbind(results, data.frame(Model = "OneR (Test)", Accuracy = accuracy_oner_test, Kappa = kappa_oner_test))
+
+
+# 2. Modelo KNN - Inicializar una lista de valores de k
+k_values <- c(1, 3)
+
+# Iterar sobre los valores de k
+for (k in k_values) {
+  # Entrenar el modelo kNN
+  model_knn <- train(Type ~ ., data = trainData, method = "knn", 
+                     tuneGrid = data.frame(k = k), trControl = control)
+  
+  # Predicciones y matrices de confusión para entrenamiento
+  predictions_train <- predict(model_knn, newdata = trainData)
+  cm_train <- confusionMatrix(predictions_train, trainData$Type)
+  
+  # Predicciones y matrices de confusión para prueba
+  predictions_test <- predict(model_knn, newdata = testData)
+  cm_test <- confusionMatrix(predictions_test, testData$Type)
+  
+  # Extraer métricas
+  accuracy_train <- cm_train$overall["Accuracy"]
+  kappa_train <- cm_train$overall["Kappa"]
+  accuracy_test <- cm_test$overall["Accuracy"]
+  kappa_test <- cm_test$overall["Kappa"]
+  
+  # Agregar resultados al dataframe "results"
+  results <- rbind(results, 
+                   data.frame(Model = paste("kNN (k =", k, ", Train)"), 
+                              Accuracy = accuracy_train, 
+                              Kappa = kappa_train))
+  results <- rbind(results, 
+                   data.frame(Model = paste("kNN (k =", k, ", Test)"), 
+                              Accuracy = accuracy_test, 
+                              Kappa = kappa_test))
+}
+
+# 3. Modelo MPG para 3, 5 y 7 neuronas
+# Normalización de datos
+# preProc <- preProcess(dataset[, -10], method = c("center", "scale"))
+# glass_norm <- predict(preProc, dataset)
+
+# Configuraciones de neuronas ocultas
+hidden_neurons <- c(3, 5, 7)
+
+# Bucle para entrenar y evaluar MLP con diferentes configuraciones
+for (neurons in hidden_neurons) {
+  # Entrenar el modelo MLP
+  model_mlp <- train(Type ~ ., data = trainData, method = "nnet", 
+                     tuneGrid = data.frame(size = neurons, decay = 0.1), 
+                     trControl = control, linout = FALSE, trace = FALSE)
+  
+  # Predicciones y matriz de confusión para conjunto de entrenamiento
+  predictions_train <- predict(model_mlp, newdata = trainData)
+  cm_train <- confusionMatrix(predictions_train, trainData$Type)
+  
+  # Predicciones y matriz de confusión para conjunto de prueba
+  predictions_test <- predict(model_mlp, newdata = testData)
+  cm_test <- confusionMatrix(predictions_test, testData$Type)
+  
+  # Extraer métricas
+  accuracy_train <- cm_train$overall["Accuracy"]
+  kappa_train <- cm_train$overall["Kappa"]
+  accuracy_test <- cm_test$overall["Accuracy"]
+  kappa_test <- cm_test$overall["Kappa"]
+  
+  # Agregar resultados al dataframe "results"
+  results <- rbind(results, 
+                   data.frame(Model = paste("MLP (", neurons, " neurons, Train)"), 
+                              Accuracy = accuracy_train, 
+                              Kappa = kappa_train))
+  results <- rbind(results, 
+                   data.frame(Model = paste("MLP (", neurons, " neurons, Test)"), 
+                              Accuracy = accuracy_test, 
+                              Kappa = kappa_test))
+}
