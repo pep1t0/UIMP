@@ -48,6 +48,13 @@ kappa_oner_test <- cm_oner_test$overall["Kappa"]
 results <- rbind(results, data.frame(Model = "OneR (Train)", Accuracy = accuracy_oner_train, Kappa = kappa_oner_train))
 results <- rbind(results, data.frame(Model = "OneR (Test)", Accuracy = accuracy_oner_test, Kappa = kappa_oner_test))
 
+# Normalizar solo las variables predictoras (para kNN y MLP)
+target_column <- ncol(trainData)
+preProc <- preProcess(trainData[, -target_column], method = c("center", "scale"))
+
+trainData_normalized <- predict(preProc, trainData)
+testData_normalized <- predict(preProc, testData)
+
 
 # 2. Modelo KNN - Inicializar una lista de valores de k
 k_values <- c(1, 3)
@@ -55,16 +62,16 @@ k_values <- c(1, 3)
 # Iterar sobre los valores de k
 for (k in k_values) {
   # Entrenar el modelo kNN
-  model_knn <- train(Type ~ ., data = trainData, method = "knn", 
+  model_knn <- train(Type ~ ., data = trainData_normalized, method = "knn", 
                      tuneGrid = data.frame(k = k), trControl = control)
   
   # Predicciones y matrices de confusión para entrenamiento
-  predictions_train <- predict(model_knn, newdata = trainData)
-  cm_train <- confusionMatrix(predictions_train, trainData$Type)
+  predictions_train <- predict(model_knn, newdata = trainData_normalized)
+  cm_train <- confusionMatrix(predictions_train, trainData_normalized$Type)
   
   # Predicciones y matrices de confusión para prueba
-  predictions_test <- predict(model_knn, newdata = testData)
-  cm_test <- confusionMatrix(predictions_test, testData$Type)
+  predictions_test <- predict(model_knn, newdata = testData_normalized)
+  cm_test <- confusionMatrix(predictions_test, testData_normalized$Type)
   
   # Extraer métricas
   accuracy_train <- cm_train$overall["Accuracy"]
@@ -84,9 +91,6 @@ for (k in k_values) {
 }
 
 # 3. Modelo MPG para 3, 5 y 7 neuronas
-# Normalización de datos
-# preProc <- preProcess(dataset[, -10], method = c("center", "scale"))
-# glass_norm <- predict(preProc, dataset)
 
 # Configuraciones de neuronas ocultas
 hidden_neurons <- c(3, 5, 7)
@@ -94,17 +98,17 @@ hidden_neurons <- c(3, 5, 7)
 # Bucle para entrenar y evaluar MLP con diferentes configuraciones
 for (neurons in hidden_neurons) {
   # Entrenar el modelo MLP
-  model_mlp <- train(Type ~ ., data = trainData, method = "nnet", 
+  model_mlp <- train(Type ~ ., data = trainData_normalized, method = "nnet", 
                      tuneGrid = data.frame(size = neurons, decay = 0.1), 
                      trControl = control, linout = FALSE, trace = FALSE)
   
   # Predicciones y matriz de confusión para conjunto de entrenamiento
-  predictions_train <- predict(model_mlp, newdata = trainData)
-  cm_train <- confusionMatrix(predictions_train, trainData$Type)
+  predictions_train <- predict(model_mlp, newdata = trainData_normalized)
+  cm_train <- confusionMatrix(predictions_train, trainData_normalized$Type)
   
   # Predicciones y matriz de confusión para conjunto de prueba
-  predictions_test <- predict(model_mlp, newdata = testData)
-  cm_test <- confusionMatrix(predictions_test, testData$Type)
+  predictions_test <- predict(model_mlp, newdata = testData_normalized)
+  cm_test <- confusionMatrix(predictions_test, testData_normalized$Type)
   
   # Extraer métricas
   accuracy_train <- cm_train$overall["Accuracy"]
