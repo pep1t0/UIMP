@@ -1,2 +1,2 @@
 # UIMP
-Trabajos del Máster en Investigación en Inteligencia Artificial
+Trabajos del Máster en Investigación en Inteligencia Artificial - Universidad Internacional Menéndez Pelayo 
